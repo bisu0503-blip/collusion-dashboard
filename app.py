@@ -177,8 +177,24 @@ latest_date = df["Date"].max().strftime("%Y-%m")
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("현재 담합 의심 점수", f"{summary.probability:.2f} / 100", summary.level)
-col2.metric("최적 지연", f"{summary.best_lag}개월")
-col3.metric("최대 상관계수", f"{summary.best_corr:.3f}")
+col2.metric(
+    "최적 지연",
+    f"{summary.best_lag}개월",
+    help=(
+        "환율을 반영한 FAO 국제 원가 변화가 국내 가격에 몇 개월 뒤 가장 비슷하게 "
+        "나타나는지를 뜻합니다. 예를 들어 4개월이면 국제 원가 변화와 국내 가격 변화가 "
+        "4개월 차이를 두고 가장 잘 맞았다는 의미입니다."
+    ),
+)
+col3.metric(
+    "최대 상관계수",
+    f"{summary.best_corr:.3f}",
+    help=(
+        "최적 지연을 적용했을 때 환율반영 국제원가지수와 국내 가격지수가 얼마나 같은 방향으로 "
+        "움직였는지를 나타냅니다. 1에 가까울수록 함께 움직이고, 0에 가까울수록 관련성이 약하며, "
+        "음수이면 반대 방향으로 움직인다는 뜻입니다."
+    ),
+)
 col4.metric("최근 공통 데이터", latest_date)
 
 st.caption(f"FAO 데이터 출처: {resolved_fao_url}")
