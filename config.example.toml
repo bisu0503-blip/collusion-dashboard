@@ -1,0 +1,16 @@
+[app]
+refresh_seconds = 300
+window_months = 18
+max_lag_months = 6
+
+[remote]
+# Optional. Leave blank to discover the latest CSV from the FAO official page.
+fao_url = ""
+
+[kosis]
+# KOSIS OpenAPI is required for domestic flour/sugar data.
+# Fill these values from KOSIS OpenAPI parameter builder.
+api_key = ""
+base_url = "https://kosis.kr/openapi/Param/statisticsParameterData.do"
+flour_params = ""
+sugar_params = ""
