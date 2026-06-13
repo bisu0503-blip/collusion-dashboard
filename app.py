@@ -15,7 +15,7 @@ except Exception:
     st_autorefresh = None
 
 
-st.set_page_config(page_title="담합 의심 실시간 대시보드", layout="wide")
+st.set_page_config(page_title="AI 기반 시장 이상 신호 대시보드", layout="wide")
 
 DEFAULT_KOSIS_PARAMS = {
     "flour": "orgId=101&tblId=DT_1J22001&objL1=T10&objL2=A01108&itmId=T&prdSe=M&newEstPrdCnt=120",
@@ -82,7 +82,7 @@ def draw_risk_chart(risk_df: pd.DataFrame) -> go.Figure:
         go.Scatter(
             x=risk_df["Date"],
             y=risk_df["Probability"],
-            name="담합 의심 점수",
+            name="AI 기반 시장 이상 신호 점수",
             mode="lines+markers",
             line=dict(color="#d62728", width=3),
         )
@@ -92,7 +92,7 @@ def draw_risk_chart(risk_df: pd.DataFrame) -> go.Figure:
     fig.update_layout(
         height=430,
         margin=dict(l=20, r=20, t=40, b=20),
-        yaxis_title="의심 점수",
+        yaxis_title="이상 신호 점수",
         xaxis_title="월",
         yaxis=dict(range=[0, 100]),
         hovermode="x unified",
@@ -100,7 +100,7 @@ def draw_risk_chart(risk_df: pd.DataFrame) -> go.Figure:
     return fig
 
 
-st.title("담합 의심 실시간 대시보드")
+st.title("AI 기반 시장 이상 신호 대시보드")
 st.caption("KOSIS OpenAPI, FAO 공식 월별 식량가격지수, 원/달러 환율을 수집해 국내 가격과 원화 기준 국제 원가의 괴리를 분석합니다.")
 
 with st.sidebar:
@@ -176,7 +176,7 @@ summary = summarize_risk(df.tail(window_months), max_lag=max_lag)
 latest_date = df["Date"].max().strftime("%Y-%m")
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("현재 담합 의심 점수", f"{summary.probability:.2f} / 100", summary.level)
+col1.metric("현재 AI 기반 시장 이상 신호 점수", f"{summary.probability:.2f} / 100", summary.level)
 col2.metric(
     "최적 지연",
     f"{summary.best_lag}개월",
@@ -225,7 +225,7 @@ with left:
     st.plotly_chart(draw_price_chart(df), use_container_width=True)
 
 with right:
-    st.subheader("Rolling 담합 의심 점수")
+    st.subheader("Rolling AI 기반 시장 이상 신호 점수")
     st.plotly_chart(draw_risk_chart(risk_df), use_container_width=True)
 
 st.subheader("최근 위험 신호")
@@ -274,10 +274,10 @@ st.info(
     "최종 판단과 책임은 이용자에게 있습니다."
 )
 
-with st.expander("담합 의심 점수 알고리즘 설명", expanded=True):
+with st.expander("AI 기반 시장 이상 신호 점수 알고리즘 설명", expanded=True):
     st.markdown(
         """
-        이 대시보드의 담합 의심 점수는 국내 가격이 환율을 반영한 국제 원재료 원가 흐름과 얼마나 다르게 움직이는지를
+        이 대시보드의 AI 기반 시장 이상 신호 점수는 국내 가격이 환율을 반영한 국제 원재료 원가 흐름과 얼마나 다르게 움직이는지를
         통계적으로 요약한 지표입니다. 점수는 특정 기업의 담합 여부를 판단하는 값이 아니라,
         가격 흐름상 추가 검토가 필요한 시점을 찾기 위한 참고용 위험 신호입니다.
 
@@ -357,7 +357,7 @@ with st.expander("담합 의심 점수 알고리즘 설명", expanded=True):
         괴리 위험 = min(평균 가격 괴리도 / 0.35, 1)
         이상치 위험 = min(이상치 비율 / 0.2, 1)
 
-        담합 의심 점수 =
+        AI 기반 시장 이상 신호 점수 =
           (상관 위험 × 0.40 + 괴리 위험 × 0.35 + 이상치 위험 × 0.25) × 100
         ```
 
@@ -369,7 +369,7 @@ with st.expander("담합 의심 점수 알고리즘 설명", expanded=True):
 
         - 0~39점: 정상 범위
         - 40~69점: 주의
-        - 70~100점: 강한 의심
+        - 70~100점: 강한 이상 신호
 
         이 점수는 시장 가격의 비정상적 움직임을 찾기 위한 통계적 신호입니다.
         실제 담합 여부를 판단하려면 입찰자료, 기업 간 관계, 공정거래위원회 사건 이력,

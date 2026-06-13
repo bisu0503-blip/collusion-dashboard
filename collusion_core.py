@@ -91,7 +91,7 @@ def summarize_risk(df: pd.DataFrame, max_lag: int = 6) -> RiskSummary:
     probability = round(float(np.clip(score, 0, 100)), 2)
 
     if probability >= 70:
-        level = "강한 의심"
+        level = "강한 이상 신호"
     elif probability >= 40:
         level = "주의"
     else:

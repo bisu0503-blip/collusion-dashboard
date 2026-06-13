@@ -1,6 +1,6 @@
-# 담합 의심 실시간 대시보드
+# AI 기반 시장 이상 신호 대시보드
 
-KOSIS OpenAPI에서 국내 밀가루/설탕/식용유 가격지수를 가져오고, FAO 공식 Food Price Index 페이지에서 최신 월별 국제 식량가격 CSV와 원/달러 환율을 수집해 담합 의심 점수를 계산하는 Streamlit 웹앱입니다.
+KOSIS OpenAPI에서 국내 밀가루/설탕/식용유 가격지수를 가져오고, FAO 공식 Food Price Index 페이지에서 최신 월별 국제 식량가격 CSV와 원/달러 환율을 수집해 AI 기반 시장 이상 신호 점수를 계산하는 Streamlit 웹앱입니다.
 
 이 앱은 법적 의미의 담합 판정 도구가 아니라, 조사 우선순위를 정하기 위한 위험 신호 대시보드입니다.
 
@@ -125,7 +125,7 @@ EXCHANGE_RATE_CSV_URL=https://query1.finance.yahoo.com/v8/finance/chart/USDKRW=X
 
 - 0~39: 정상 범위
 - 40~69: 주의
-- 70~100: 강한 의심
+- 70~100: 강한 이상 신호
 
 ## 주의
 
