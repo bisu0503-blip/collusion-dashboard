@@ -94,6 +94,7 @@ def load_fao_product(product: str, csv_url: str | None = None) -> tuple[pd.DataF
     column_candidates = {
         "flour": ["Cereals Price Index", "Cereals"],
         "sugar": ["Sugar Price Index", "Sugar"],
+        "oil": ["Oils Price Index", "Oils"],
     }
 
     raw = _read_fao_csv(source_url)
