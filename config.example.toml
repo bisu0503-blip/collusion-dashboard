@@ -12,5 +12,5 @@ fao_url = ""
 # Fill these values from KOSIS OpenAPI parameter builder.
 api_key = ""
 base_url = "https://kosis.kr/openapi/Param/statisticsParameterData.do"
-flour_params = ""
-sugar_params = ""
+flour_params = "orgId=101&tblId=DT_1J22001&objL1=T10&objL2=A01108&itmId=T&prdSe=M&newEstPrdCnt=120"
+sugar_params = "orgId=101&tblId=DT_1J22001&objL1=T10&objL2=A01808&itmId=T&prdSe=M&newEstPrdCnt=120"

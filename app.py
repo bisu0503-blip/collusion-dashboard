@@ -17,6 +17,11 @@ except Exception:
 
 st.set_page_config(page_title="담합 의심 실시간 대시보드", layout="wide")
 
+DEFAULT_KOSIS_PARAMS = {
+    "flour": "orgId=101&tblId=DT_1J22001&objL1=T10&objL2=A01108&itmId=T&prdSe=M&newEstPrdCnt=120",
+    "sugar": "orgId=101&tblId=DT_1J22001&objL1=T10&objL2=A01808&itmId=T&prdSe=M&newEstPrdCnt=120",
+}
+
 
 def get_secret(name: str, default: str = "") -> str:
     value = os.getenv(name)
@@ -95,7 +100,7 @@ with st.sidebar:
 
     secret_api_key = get_secret("KOSIS_API_KEY")
     secret_base_url = get_secret("KOSIS_BASE_URL", "https://kosis.kr/openapi/Param/statisticsParameterData.do")
-    secret_params = get_product_secret(product, "PARAMS")
+    secret_params = get_product_secret(product, "PARAMS", DEFAULT_KOSIS_PARAMS[product])
     secret_fao_csv_url = get_secret("FAO_CSV_URL")
 
     if secret_api_key and secret_params:

@@ -27,8 +27,8 @@ Streamlit Community Cloud의 `App settings > Secrets`에 아래 형식으로 입
 KOSIS_API_KEY = "발급받은_KOSIS_API_키"
 KOSIS_BASE_URL = "https://kosis.kr/openapi/Param/statisticsParameterData.do"
 
-KOSIS_FLOUR_PARAMS = "orgId=...&tblId=...&itmId=...&objL1=...&prdSe=M&newEstPrdCnt=120"
-KOSIS_SUGAR_PARAMS = "orgId=...&tblId=...&itmId=...&objL1=...&prdSe=M&newEstPrdCnt=120"
+KOSIS_FLOUR_PARAMS = "orgId=101&tblId=DT_1J22001&objL1=T10&objL2=A01108&itmId=T&prdSe=M&newEstPrdCnt=120"
+KOSIS_SUGAR_PARAMS = "orgId=101&tblId=DT_1J22001&objL1=T10&objL2=A01808&itmId=T&prdSe=M&newEstPrdCnt=120"
 
 # 선택 사항
 FAO_CSV_URL = ""
@@ -87,8 +87,8 @@ Render의 `Environment` 메뉴에서 아래 환경변수를 추가합니다.
 ```text
 KOSIS_API_KEY=발급받은_KOSIS_API_키
 KOSIS_BASE_URL=https://kosis.kr/openapi/Param/statisticsParameterData.do
-KOSIS_FLOUR_PARAMS=orgId=...&tblId=...&itmId=...&objL1=...&prdSe=M&newEstPrdCnt=120
-KOSIS_SUGAR_PARAMS=orgId=...&tblId=...&itmId=...&objL1=...&prdSe=M&newEstPrdCnt=120
+KOSIS_FLOUR_PARAMS=orgId=101&tblId=DT_1J22001&objL1=T10&objL2=A01108&itmId=T&prdSe=M&newEstPrdCnt=120
+KOSIS_SUGAR_PARAMS=orgId=101&tblId=DT_1J22001&objL1=T10&objL2=A01808&itmId=T&prdSe=M&newEstPrdCnt=120
 FAO_CSV_URL=
 ```
 
