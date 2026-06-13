@@ -15,7 +15,7 @@ FAO_FALLBACK_CSV_URL = (
     "https://www.fao.org/media/docs/worldfoodsituationlibraries/default-document-library/"
     "food_price_indices_data.csv?download=true"
 )
-EXCHANGE_RATE_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DEXKOUS"
+EXCHANGE_RATE_CSV_URL = "https://query1.finance.yahoo.com/v8/finance/chart/USDKRW=X?range=10y&interval=1d"
 
 REQUEST_HEADERS = {
     "User-Agent": (
@@ -113,13 +113,44 @@ def load_fao_product(product: str, csv_url: str | None = None) -> tuple[pd.DataF
     return df.dropna().sort_values("Date"), source_url
 
 
-def load_exchange_rate(csv_url: str | None = None) -> tuple[pd.DataFrame, str]:
-    source_url = csv_url.strip() if csv_url else EXCHANGE_RATE_CSV_URL
-    response = _get(source_url, timeout=45)
+def _monthly_exchange_from_daily(df: pd.DataFrame) -> pd.DataFrame:
+    monthly = (
+        df.set_index("Date")["ExchangeRate"]
+        .resample("MS")
+        .mean()
+        .dropna()
+        .reset_index()
+    )
+    return monthly.sort_values("Date")
+
+
+def _load_yahoo_exchange_rate(url: str) -> pd.DataFrame:
+    response = _get(url, timeout=12)
+    data = response.json()
+    result = data["chart"]["result"][0]
+    timestamps = result["timestamp"]
+    closes = result["indicators"]["quote"][0]["close"]
+
+    df = pd.DataFrame(
+        {
+            "Date": pd.to_datetime(timestamps, unit="s", errors="coerce"),
+            "ExchangeRate": pd.to_numeric(closes, errors="coerce"),
+        }
+    ).dropna()
+    if df.empty:
+        raise ValueError("Yahoo 환율 응답에 사용 가능한 원/달러 값이 없습니다.")
+    return _monthly_exchange_from_daily(df)
+
+
+def _load_csv_exchange_rate(url: str) -> pd.DataFrame:
+    response = _get(url, timeout=12)
     raw = pd.read_csv(BytesIO(response.content))
 
     date_col = next((col for col in ["DATE", "Date", "date"] if col in raw.columns), None)
-    value_col = next((col for col in ["DEXKOUS", "USD_KRW", "ExchangeRate", "rate"] if col in raw.columns), None)
+    value_col = next(
+        (col for col in ["DEXKOUS", "USD_KRW", "ExchangeRate", "rate", "Close", "close"] if col in raw.columns),
+        None,
+    )
     if date_col is None or value_col is None:
         raise ValueError("환율 CSV에서 날짜/원달러 환율 컬럼을 찾지 못했습니다.")
 
@@ -131,15 +162,14 @@ def load_exchange_rate(csv_url: str | None = None) -> tuple[pd.DataFrame, str]:
     ).dropna()
     if df.empty:
         raise ValueError("환율 데이터가 비어 있습니다.")
+    return _monthly_exchange_from_daily(df)
 
-    monthly = (
-        df.set_index("Date")["ExchangeRate"]
-        .resample("MS")
-        .mean()
-        .dropna()
-        .reset_index()
-    )
-    return monthly.sort_values("Date"), source_url
+
+def load_exchange_rate(csv_url: str | None = None) -> tuple[pd.DataFrame, str]:
+    source_url = csv_url.strip() if csv_url else EXCHANGE_RATE_CSV_URL
+    if "query" in source_url and "finance.yahoo.com" in source_url:
+        return _load_yahoo_exchange_rate(source_url), source_url
+    return _load_csv_exchange_rate(source_url), source_url
 
 
 def apply_exchange_rate(global_df: pd.DataFrame, exchange_df: pd.DataFrame) -> pd.DataFrame:

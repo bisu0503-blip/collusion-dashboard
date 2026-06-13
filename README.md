@@ -10,7 +10,7 @@ CSV 파일을 저장소에 포함하지 않습니다.
 
 - 국내 밀가루/설탕/식용유: KOSIS OpenAPI
 - 국제 곡물/설탕/식물성유지: FAO Food Price Index 공식 월별 CSV
-- 원/달러 환율: FRED DEXKOUS 일별 CSV를 월평균으로 변환
+- 원/달러 환율: Yahoo Finance `USDKRW=X` 일별 환율을 월평균으로 변환
 
 FAO 공식 페이지:
 
@@ -20,10 +20,10 @@ https://www.fao.org/worldfoodsituation/foodpricesindex/en/
 
 앱은 위 페이지에서 `food_price_indices_data.csv` 링크를 자동으로 찾아 다운로드합니다. `FAO_CSV_URL`을 직접 지정하면 그 URL을 우선 사용합니다.
 
-환율은 기본적으로 아래 CSV를 사용합니다.
+환율은 기본적으로 아래 Yahoo Finance JSON 데이터를 사용합니다.
 
 ```text
-https://fred.stlouisfed.org/graph/fredgraph.csv?id=DEXKOUS
+https://query1.finance.yahoo.com/v8/finance/chart/USDKRW=X?range=10y&interval=1d
 ```
 
 앱은 일별 원/달러 환율을 월평균으로 바꾼 뒤 `FAO 지수 × 환율지수 / 100` 방식으로 원화 기준 국제 원가지수를 계산합니다.
@@ -42,7 +42,7 @@ KOSIS_OIL_PARAMS = "orgId=101&tblId=DT_1J22001&objL1=T10&objL2=A01502&itmId=T&pr
 
 # 선택 사항
 FAO_CSV_URL = ""
-EXCHANGE_RATE_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DEXKOUS"
+EXCHANGE_RATE_CSV_URL = "https://query1.finance.yahoo.com/v8/finance/chart/USDKRW=X?range=10y&interval=1d"
 ```
 
 API 키는 GitHub에 올리지 마세요. 실제 키는 Streamlit Secrets 또는 Render 환경변수에만 저장해야 합니다.
@@ -103,7 +103,7 @@ KOSIS_FLOUR_PARAMS=orgId=101&tblId=DT_1J22001&objL1=T10&objL2=A01108&itmId=T&prd
 KOSIS_SUGAR_PARAMS=orgId=101&tblId=DT_1J22001&objL1=T10&objL2=A01808&itmId=T&prdSe=M&newEstPrdCnt=120
 KOSIS_OIL_PARAMS=orgId=101&tblId=DT_1J22001&objL1=T10&objL2=A01502&itmId=T&prdSe=M&newEstPrdCnt=120
 FAO_CSV_URL=
-EXCHANGE_RATE_CSV_URL=https://fred.stlouisfed.org/graph/fredgraph.csv?id=DEXKOUS
+EXCHANGE_RATE_CSV_URL=https://query1.finance.yahoo.com/v8/finance/chart/USDKRW=X?range=10y&interval=1d
 ```
 
 ## 점수 계산

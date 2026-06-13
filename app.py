@@ -139,9 +139,9 @@ with st.sidebar:
 
     with st.expander("환율 수집 설정"):
         exchange_csv_url = st.text_input(
-            "원/달러 환율 CSV URL",
+            "원/달러 환율 URL",
             value=secret_exchange_csv_url,
-            help="기본값은 FRED DEXKOUS 일별 원/달러 환율이며, 앱에서 월평균으로 변환합니다.",
+            help="기본값은 Yahoo Finance USDKRW=X 일별 환율이며, 앱에서 월평균으로 변환합니다.",
         ).strip() or None
 
     st.header("모델 설정")

@@ -7,7 +7,7 @@ max_lag_months = 6
 # Optional. Leave blank to discover the latest CSV from the FAO official page.
 fao_url = ""
 # Optional. Daily USD/KRW data. The app converts it to monthly averages.
-exchange_rate_url = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DEXKOUS"
+exchange_rate_url = "https://query1.finance.yahoo.com/v8/finance/chart/USDKRW=X?range=10y&interval=1d"
 
 [kosis]
 # KOSIS OpenAPI is required for domestic flour/sugar data.
