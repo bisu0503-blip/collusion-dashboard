@@ -6,6 +6,8 @@ from urllib.parse import parse_qsl, urljoin
 
 import pandas as pd
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 
 FAO_FOOD_PRICE_PAGE = "https://www.fao.org/worldfoodsituation/foodpricesindex/en/"
@@ -14,10 +16,50 @@ FAO_FALLBACK_CSV_URL = (
     "food_price_indices_data.csv?download=true"
 )
 
+REQUEST_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/126.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml,text/csv,application/json,*/*;q=0.8",
+    "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Connection": "close",
+}
+
+
+def _session() -> requests.Session:
+    retry = Retry(
+        total=4,
+        connect=4,
+        read=4,
+        backoff_factor=1.2,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=("GET",),
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session = requests.Session()
+    session.headers.update(REQUEST_HEADERS)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
+def _get(url: str, **kwargs) -> requests.Response:
+    try:
+        response = _session().get(url, timeout=kwargs.pop("timeout", 45), **kwargs)
+        response.raise_for_status()
+        return response
+    except requests.RequestException as exc:
+        raise RuntimeError(f"External data request failed: {url} ({exc})") from exc
+
 
 def discover_fao_csv_url(page_url: str = FAO_FOOD_PRICE_PAGE) -> str:
-    response = requests.get(page_url, timeout=20)
-    response.raise_for_status()
+    try:
+        response = _get(page_url, timeout=30)
+    except RuntimeError:
+        return FAO_FALLBACK_CSV_URL
 
     matches = re.findall(r'href=["\']([^"\']*food_price_indices_data[^"\']*\.csv[^"\']*)["\']', response.text)
     if matches:
@@ -31,8 +73,7 @@ def discover_fao_csv_url(page_url: str = FAO_FOOD_PRICE_PAGE) -> str:
 
 
 def _read_fao_csv(csv_url: str) -> pd.DataFrame:
-    response = requests.get(csv_url, timeout=30)
-    response.raise_for_status()
+    response = _get(csv_url, timeout=45)
     content = response.content
 
     for header in (0, 1, 2):
@@ -98,8 +139,7 @@ def load_kosis(api_key: str, base_url: str, params_text: str) -> pd.DataFrame:
     params.pop("method", None)
     params.update({"method": "getList", "apiKey": api_key, "format": "json", "jsonVD": "Y"})
 
-    response = requests.get(base_url, params=params, timeout=30)
-    response.raise_for_status()
+    response = _get(base_url, params=params, timeout=45)
     data = response.json()
 
     if isinstance(data, dict) and data.get("err"):
