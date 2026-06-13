@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from collusion_core import merge_market_data, rolling_risk, summarize_risk
-from data_sources import FAO_FOOD_PRICE_PAGE, load_fao_product, load_kosis
+from data_sources import EXCHANGE_RATE_CSV_URL, FAO_FOOD_PRICE_PAGE, load_fao_product_krw, load_kosis
 
 try:
     from streamlit_autorefresh import st_autorefresh
@@ -39,10 +39,19 @@ def get_product_secret(product: str, suffix: str, default: str = "") -> str:
 
 
 @st.cache_data(show_spinner=False, ttl=300)
-def load_market(product: str, kosis_config: dict, fao_csv_url: str | None) -> tuple[pd.DataFrame, str]:
-    global_df, resolved_fao_url = load_fao_product(product, csv_url=fao_csv_url)
+def load_market(
+    product: str,
+    kosis_config: dict,
+    fao_csv_url: str | None,
+    exchange_csv_url: str | None,
+) -> tuple[pd.DataFrame, str, str]:
+    global_df, resolved_fao_url, resolved_exchange_url = load_fao_product_krw(
+        product,
+        csv_url=fao_csv_url,
+        exchange_csv_url=exchange_csv_url,
+    )
     korea_df = load_kosis(kosis_config["api_key"], kosis_config["base_url"], kosis_config["params"])
-    return merge_market_data(global_df, korea_df), resolved_fao_url
+    return merge_market_data(global_df, korea_df), resolved_fao_url, resolved_exchange_url
 
 
 def probability_color(value: float) -> str:
@@ -55,7 +64,7 @@ def probability_color(value: float) -> str:
 
 def draw_price_chart(df: pd.DataFrame) -> go.Figure:
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=df["Date"], y=df["Global_norm"], name="FAO 국제 원재료 지수", mode="lines+markers"))
+    fig.add_trace(go.Scatter(x=df["Date"], y=df["Global_norm"], name="환율 반영 FAO 원화 기준 지수", mode="lines+markers"))
     fig.add_trace(go.Scatter(x=df["Date"], y=df["Korea_norm"], name="KOSIS 국내 가격지수", mode="lines+markers"))
     fig.update_layout(
         height=430,
@@ -92,7 +101,7 @@ def draw_risk_chart(risk_df: pd.DataFrame) -> go.Figure:
 
 
 st.title("담합 의심 실시간 대시보드")
-st.caption("KOSIS OpenAPI와 FAO 공식 월별 식량가격지수를 실시간으로 수집해 국내 가격과 국제 가격의 괴리를 분석합니다.")
+st.caption("KOSIS OpenAPI, FAO 공식 월별 식량가격지수, 원/달러 환율을 수집해 국내 가격과 원화 기준 국제 원가의 괴리를 분석합니다.")
 
 with st.sidebar:
     st.header("실시간 데이터 설정")
@@ -104,6 +113,7 @@ with st.sidebar:
     secret_base_url = get_secret("KOSIS_BASE_URL", "https://kosis.kr/openapi/Param/statisticsParameterData.do")
     secret_params = get_product_secret(product, "PARAMS", DEFAULT_KOSIS_PARAMS[product])
     secret_fao_csv_url = get_secret("FAO_CSV_URL")
+    secret_exchange_csv_url = get_secret("EXCHANGE_RATE_CSV_URL", EXCHANGE_RATE_CSV_URL)
 
     if secret_api_key and secret_params:
         st.success("배포 Secrets의 KOSIS 설정을 사용 중입니다.")
@@ -127,6 +137,13 @@ with st.sidebar:
             value=secret_fao_csv_url,
         ).strip() or None
 
+    with st.expander("환율 수집 설정"):
+        exchange_csv_url = st.text_input(
+            "원/달러 환율 CSV URL",
+            value=secret_exchange_csv_url,
+            help="기본값은 FRED DEXKOUS 일별 원/달러 환율이며, 앱에서 월평균으로 변환합니다.",
+        ).strip() or None
+
     st.header("모델 설정")
     refresh_seconds = st.slider("자동 갱신 주기(초)", 60, 3600, 300, 60)
     window_months = st.slider("Rolling 분석 기간(개월)", 6, 60, 18)
@@ -144,7 +161,7 @@ else:
 kosis_config = {"api_key": api_key, "base_url": base_url, "params": params}
 
 try:
-    df, resolved_fao_url = load_market(product, kosis_config, fao_csv_url)
+    df, resolved_fao_url, resolved_exchange_url = load_market(product, kosis_config, fao_csv_url, exchange_csv_url)
 except Exception as exc:
     st.error(f"실시간 데이터를 불러오지 못했습니다: {exc}")
     st.stop()
@@ -165,6 +182,7 @@ col3.metric("최대 상관계수", f"{summary.best_corr:.3f}")
 col4.metric("최근 공통 데이터", latest_date)
 
 st.caption(f"FAO 데이터 출처: {resolved_fao_url}")
+st.caption(f"환율 데이터 출처: {resolved_exchange_url}")
 
 gauge = go.Figure(
     go.Indicator(
@@ -187,7 +205,7 @@ st.plotly_chart(gauge, use_container_width=True)
 
 left, right = st.columns(2)
 with left:
-    st.subheader("FAO 국제 가격 vs KOSIS 국내 가격")
+    st.subheader("환율 반영 FAO 국제 원가 vs KOSIS 국내 가격")
     st.plotly_chart(draw_price_chart(df), use_container_width=True)
 
 with right:
@@ -196,8 +214,32 @@ with right:
 
 st.subheader("최근 위험 신호")
 view = df.merge(risk_df, on="Date", how="left")
-view = view[["Date", "Global", "Korea", "gap", "pass_through_gap", "Probability", "Level"]].tail(24)
+view = view[
+    [
+        "Date",
+        "FAO_Global",
+        "ExchangeRate",
+        "ExchangeIndex",
+        "Global",
+        "Korea",
+        "gap",
+        "pass_through_gap",
+        "Probability",
+        "Level",
+    ]
+].tail(24)
 view["Date"] = view["Date"].dt.strftime("%Y-%m")
+view = view.rename(
+    columns={
+        "FAO_Global": "FAO 원지수",
+        "ExchangeRate": "원/달러 환율",
+        "ExchangeIndex": "환율지수",
+        "Global": "환율반영 국제원가지수",
+        "Korea": "국내 가격지수",
+        "gap": "가격 괴리도",
+        "pass_through_gap": "변화율 괴리도",
+    }
+)
 st.dataframe(view.sort_values("Date", ascending=False), use_container_width=True, hide_index=True)
 
 st.caption(
@@ -219,7 +261,7 @@ st.info(
 with st.expander("담합 의심 점수 알고리즘 설명", expanded=True):
     st.markdown(
         """
-        이 대시보드의 담합 의심 점수는 국내 가격이 국제 원재료 가격 흐름과 얼마나 다르게 움직이는지를
+        이 대시보드의 담합 의심 점수는 국내 가격이 환율을 반영한 국제 원재료 원가 흐름과 얼마나 다르게 움직이는지를
         통계적으로 요약한 지표입니다. 점수는 특정 기업의 담합 여부를 판단하는 값이 아니라,
         가격 흐름상 추가 검토가 필요한 시점을 찾기 위한 참고용 위험 신호입니다.
 
@@ -230,45 +272,59 @@ with st.expander("담합 의심 점수 알고리즘 설명", expanded=True):
         - 설탕 국내 지표: `DT_1J22001`, 전국 `T10`, 설탕 `A01808`
         - 식용유 국내 지표: `DT_1J22001`, 전국 `T10`, 식용유 `A01502`
         - 국제 가격: FAO Food Price Index의 월별 Cereals, Sugar 또는 Oils 지수
+        - 환율: 원/달러 일별 환율을 월평균으로 변환한 값
 
         **2. 날짜 기준 병합**
 
-        KOSIS와 FAO 데이터는 월 단위로 제공되므로, 같은 월에 존재하는 데이터만 남겨 비교합니다.
-        예를 들어 국내 데이터가 2026년 5월까지 있고 FAO 데이터도 2026년 5월까지 있으면,
-        두 데이터가 모두 존재하는 월만 분석에 사용합니다.
+        KOSIS와 FAO 데이터는 월 단위로 제공되고, 환율은 일별 데이터를 월평균으로 변환합니다.
+        이후 국내 가격, FAO 국제 가격, 원/달러 환율이 모두 존재하는 월만 남겨 비교합니다.
 
-        **3. 정규화**
+        **3. 환율 반영 국제 원가 계산**
 
-        국내 지수와 국제 지수는 기준연도와 단위가 다르기 때문에 직접 비교할 수 없습니다.
+        FAO 국제 가격지수는 달러 기준 국제 시장 흐름을 보여주지만, 국내 수입 원가에는 원/달러 환율이 함께 작용합니다.
+        그래서 원/달러 환율을 기준 시점 대비 지수로 바꾼 뒤 FAO 지수에 곱합니다.
+
+        ```text
+        환율지수_t = 원달러환율_t / 기준월 원달러환율 × 100
+
+        환율반영 국제원가지수_t =
+          FAO 국제가격지수_t × 환율지수_t / 100
+        ```
+
+        예를 들어 FAO 가격이 그대로여도 원/달러 환율이 10% 오르면, 원화 기준 국제 원가는 약 10% 상승한 것으로 반영됩니다.
+
+        **4. 정규화**
+
+        국내 지수와 환율반영 국제원가지수는 기준연도와 단위가 다르기 때문에 직접 비교할 수 없습니다.
         그래서 각각의 값을 0~1 범위로 변환합니다.
 
         ```text
         정규화값 = (현재값 - 최솟값) / (최댓값 - 최솟값)
         ```
 
-        이렇게 하면 국내 가격과 국제 가격의 절대 수준이 아니라, 기간 안에서의 상대적 움직임을 비교할 수 있습니다.
+        이렇게 하면 국내 가격과 원화 기준 국제 원가의 절대 수준이 아니라, 기간 안에서의 상대적 움직임을 비교할 수 있습니다.
 
-        **4. 가격 연동성 분석**
+        **5. 가격 연동성 분석**
 
-        일반적으로 밀가루, 설탕, 식용유 같은 식품 가격은 국제 곡물·설탕·식물성유지 가격의 영향을 어느 정도 받습니다.
-        따라서 국제 가격과 국내 가격의 상관계수를 계산합니다. 상관계수가 낮거나 음수에 가까우면
-        국내 가격이 국제 가격 흐름과 다르게 움직인다는 의미로 보고 위험 신호를 높입니다.
+        일반적으로 밀가루, 설탕, 식용유 같은 식품 가격은 국제 곡물·설탕·식물성유지 가격과 환율의 영향을 어느 정도 받습니다.
+        따라서 환율반영 국제원가지수와 국내 가격의 상관계수를 계산합니다. 상관계수가 낮거나 음수에 가까우면
+        국내 가격이 원화 기준 국제 원가 흐름과 다르게 움직인다는 의미로 보고 위험 신호를 높입니다.
 
         단, 국내 가격은 국제 가격을 즉시 반영하지 않을 수 있으므로 0~최대 지연 개월 수까지
-        lag 분석을 합니다. 예를 들어 최대 지연을 6개월로 설정하면, 국제 가격 변화가 국내 가격에
+        lag 분석을 합니다. 예를 들어 최대 지연을 6개월로 설정하면, 원화 기준 국제 원가 변화가 국내 가격에
         0개월 뒤, 1개월 뒤, ..., 6개월 뒤 반영되는 경우를 모두 비교하고 가장 높은 상관계수를 선택합니다.
 
-        **5. 가격 괴리도 계산**
+        **6. 가격 괴리도 계산**
 
-        정규화된 국내 가격과 국제 가격의 차이를 월별로 계산합니다.
+        정규화된 국내 가격과 환율반영 국제원가지수의 차이를 월별로 계산합니다.
 
         ```text
-        가격 괴리도 = |국내 정규화 지수 - 국제 정규화 지수|
+        가격 괴리도 = |국내 정규화 지수 - 환율반영 국제원가 정규화 지수|
         ```
 
-        이 값이 클수록 국제 원재료 가격 흐름과 국내 소비자 가격 흐름 사이의 차이가 크다는 뜻입니다.
+        이 값이 클수록 원화 기준 국제 원가 흐름과 국내 소비자 가격 흐름 사이의 차이가 크다는 뜻입니다.
 
-        **6. 이상치 탐지**
+        **7. 이상치 탐지**
 
         국내 가격 정규화값과 가격 괴리도를 함께 사용해 이상치를 탐지합니다.
         scikit-learn이 설치된 환경에서는 Isolation Forest를 사용하고, 사용할 수 없는 환경에서는
@@ -276,7 +332,7 @@ with st.expander("담합 의심 점수 알고리즘 설명", expanded=True):
 
         이상치 비율이 높다는 것은 분석 기간 안에서 평소와 다른 가격 움직임이 자주 나타났다는 뜻입니다.
 
-        **7. 최종 점수 계산**
+        **8. 최종 점수 계산**
 
         최종 점수는 세 가지 위험 신호를 가중합해 0~100점으로 변환합니다.
 
@@ -290,10 +346,10 @@ with st.expander("담합 의심 점수 알고리즘 설명", expanded=True):
         ```
 
         현재 가중치는 상관계수 약화 40%, 가격 괴리 35%, 이상치 비율 25%입니다.
-        즉 국제 가격과 국내 가격의 연동성이 약해지는 현상을 가장 크게 보고,
+        즉 원화 기준 국제 원가와 국내 가격의 연동성이 약해지는 현상을 가장 크게 보고,
         그 다음으로 가격 괴리와 이상치 발생을 반영합니다.
 
-        **8. 점수 해석**
+        **9. 점수 해석**
 
         - 0~39점: 정상 범위
         - 40~69점: 주의
@@ -301,6 +357,6 @@ with st.expander("담합 의심 점수 알고리즘 설명", expanded=True):
 
         이 점수는 시장 가격의 비정상적 움직임을 찾기 위한 통계적 신호입니다.
         실제 담합 여부를 판단하려면 입찰자료, 기업 간 관계, 공정거래위원회 사건 이력,
-        가격 결정 구조, 유통 비용, 환율, 세금, 정책 변화 같은 추가 자료와 함께 검토해야 합니다.
+        가격 결정 구조, 유통 비용, 세금, 정책 변화 같은 추가 자료와 함께 검토해야 합니다.
         """
     )

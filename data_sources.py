@@ -15,6 +15,7 @@ FAO_FALLBACK_CSV_URL = (
     "https://www.fao.org/media/docs/worldfoodsituationlibraries/default-document-library/"
     "food_price_indices_data.csv?download=true"
 )
+EXCHANGE_RATE_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DEXKOUS"
 
 REQUEST_HEADERS = {
     "User-Agent": (
@@ -110,6 +111,60 @@ def load_fao_product(product: str, csv_url: str | None = None) -> tuple[pd.DataF
     df = raw[["Date", column]].rename(columns={column: "Global"}).dropna()
     df["Global"] = pd.to_numeric(df["Global"], errors="coerce")
     return df.dropna().sort_values("Date"), source_url
+
+
+def load_exchange_rate(csv_url: str | None = None) -> tuple[pd.DataFrame, str]:
+    source_url = csv_url.strip() if csv_url else EXCHANGE_RATE_CSV_URL
+    response = _get(source_url, timeout=45)
+    raw = pd.read_csv(BytesIO(response.content))
+
+    date_col = next((col for col in ["DATE", "Date", "date"] if col in raw.columns), None)
+    value_col = next((col for col in ["DEXKOUS", "USD_KRW", "ExchangeRate", "rate"] if col in raw.columns), None)
+    if date_col is None or value_col is None:
+        raise ValueError("환율 CSV에서 날짜/원달러 환율 컬럼을 찾지 못했습니다.")
+
+    df = pd.DataFrame(
+        {
+            "Date": pd.to_datetime(raw[date_col], errors="coerce"),
+            "ExchangeRate": pd.to_numeric(raw[value_col].replace(".", pd.NA), errors="coerce"),
+        }
+    ).dropna()
+    if df.empty:
+        raise ValueError("환율 데이터가 비어 있습니다.")
+
+    monthly = (
+        df.set_index("Date")["ExchangeRate"]
+        .resample("MS")
+        .mean()
+        .dropna()
+        .reset_index()
+    )
+    return monthly.sort_values("Date"), source_url
+
+
+def apply_exchange_rate(global_df: pd.DataFrame, exchange_df: pd.DataFrame) -> pd.DataFrame:
+    df = pd.merge(global_df, exchange_df, on="Date", how="inner").sort_values("Date")
+    if df.empty:
+        raise ValueError("FAO 데이터와 환율 데이터의 공통 월을 찾지 못했습니다.")
+
+    base_rate = df["ExchangeRate"].dropna().iloc[0]
+    if pd.isna(base_rate) or base_rate == 0:
+        raise ValueError("환율 기준값이 올바르지 않습니다.")
+
+    df = df.rename(columns={"Global": "FAO_Global"})
+    df["ExchangeIndex"] = df["ExchangeRate"] / base_rate * 100
+    df["Global"] = df["FAO_Global"] * df["ExchangeIndex"] / 100
+    return df[["Date", "FAO_Global", "ExchangeRate", "ExchangeIndex", "Global"]].dropna()
+
+
+def load_fao_product_krw(
+    product: str,
+    csv_url: str | None = None,
+    exchange_csv_url: str | None = None,
+) -> tuple[pd.DataFrame, str, str]:
+    global_df, fao_source_url = load_fao_product(product, csv_url=csv_url)
+    exchange_df, exchange_source_url = load_exchange_rate(exchange_csv_url)
+    return apply_exchange_rate(global_df, exchange_df), fao_source_url, exchange_source_url
 
 
 def _parse_kosis_date(series: pd.Series) -> pd.Series:
