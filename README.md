@@ -35,6 +35,7 @@ FAO_CSV_URL = ""
 ```
 
 API 키는 GitHub에 올리지 마세요. 실제 키는 Streamlit Secrets 또는 Render 환경변수에만 저장해야 합니다.
+KOSIS API 키는 마지막 `=` 문자까지 포함해 한 줄로 붙여넣어야 합니다. 앞뒤 공백이나 줄바꿈이 들어가면 KOSIS가 `유효하지 않은 인증KEY` 오류를 반환할 수 있습니다.
 
 ## 로컬 실행
 

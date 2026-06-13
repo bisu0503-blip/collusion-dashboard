@@ -126,7 +126,15 @@ def _parse_kosis_date(series: pd.Series) -> pd.Series:
     return parsed
 
 
+def _clean_secret_value(value: str) -> str:
+    return str(value or "").strip().strip('"').strip("'").replace("\r", "").replace("\n", "")
+
+
 def load_kosis(api_key: str, base_url: str, params_text: str) -> pd.DataFrame:
+    api_key = _clean_secret_value(api_key)
+    base_url = _clean_secret_value(base_url)
+    params_text = str(params_text or "").strip()
+
     if not api_key:
         raise ValueError("KOSIS_API_KEY가 설정되어 있지 않습니다.")
     if not params_text:
